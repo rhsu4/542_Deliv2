@@ -1,0 +1,742 @@
+---
+title: "Cluster Analysis"
+output: html_notebook
+---
+Read in the Data
+```{r}
+allData <- read.csv ("https://raw.githubusercontent.com/rhsu4/542_Deliv1/main/allDataWide.csv")
+#WILL NEED TO FIX THE LONG FILE - I don't think it actually distributed the health expenditure by year when it melted. 
+
+
+#Taking only 2018 data
+#subsetData <- subset(allData, Year == "2018", select = c("Country", "GiniPercent", "LifeExp", "HealthExp", "Year"))
+#Would only do this for long format, but long format data needs to be fixed
+
+row.names(allData) = NULL
+
+#check data types
+str(allData)
+
+#Have to make LE2018 numeric
+allData$LE2018<-as.numeric(allData$LE2018)
+
+str(allData)
+
+```
+Preparing Data for clustering
+
+```{r}
+#Setting row names as country names doesn't work because countries are repeating
+selection=c("Country", "GiniPercent", "HE2018", "LE2018")
+dataToCluster=allData[,selection]
+
+#set labels as row index
+
+row.names(dataToCluster) = dataToCluster$Country
+dataToCluster$Country=NULL
+
+#This will give you an error if the country is repeated (because row index names need to be unique)
+
+#Decide if data needs to be transformed
+boxplot(dataToCluster, horizontal=T)
+#Yes, has to be transformed, on different scales
+
+```
+Standardizing Data, because on a different scale
+
+```{r}
+#### standardizing
+DataToClusterStd<-as.data.frame(scale(dataToCluster))
+
+### or smoothing
+#log(DataToClusterStd)
+
+boxplot(DataToClusterStd)
+```
+II. Compute the DISTANCE MATRIX
+
+
+```{r}
+dtcsFinal <- na.omit(DataToClusterStd)
+#This includes only instances that have no missing values (153 obs left)
+
+dtcsFinal_DM = daisy (x=dtcsFinal, metric = "gower")
+```
+
+```{r}
+#Set random seed
+set.seed(999)
+
+library(cluster)
+dataToCluster_DM = daisy (x=dtcsFinal, metric = "gower")
+```
+
+Compute Clusters - Computer suggestions
+Using function fviz_nbclust from the library factoextra we can see how many clustered are suggested.
+
+
+```{r}
+#for partitioning
+library(factoextra)
+
+#Missing values - have to either add imputed (mean) values, or remove variables that have missing data
+##Life Expectancy - have to replace ".." with "NaN" (in python?)
+##health expectancy - maybe just use this for now, and drop missing countries
+
+
+fviz_nbclust(dtcsFinal, 
+             pam,
+             diss=dataToCluster_DM,
+             method = "gap_stat",
+             k.max = 10,verbose = F)
+
+#Optimal number of clusters = 9
+```
+```{r}
+#hierarchical - agglomerative 
+fviz_nbclust(dtcsFinal, 
+             hcut,
+             diss=dataToCluster_DM,
+             method = "gap_stat",
+             k.max = 10,
+             verbose = F,
+             hc_func = "agnes")
+#agglomerative optimal # of clusters = 4
+```
+
+```{r}
+#hierarchical (divisive)
+fviz_nbclust(dtcsFinal, 
+             hcut,
+             diss=dataToCluster_DM,
+             method = "gap_stat",
+             k.max = 10,
+             verbose = F,
+             hc_func = "diana")
+
+#divisive clusters = 2
+```
+
+Apply function
+a priori clusters:
+(partitioning? first kind) = 9
+agglomerative = 4
+divisive = 2
+
+```{r}
+NumberOfClusterDesired=4
+
+#For clusters = 9, highest avg silhouette width = .33
+#For clusters = 4, highest avg silhouette width = .37 (pam and agnes)
+#For clusters = 2, highest avg silhouette width = .38 (pam and diana)
+
+#FLAG: Is 2 clusters enough clusters?
+
+# Partitioning technique
+res.pam = pam(x=dataToCluster_DM,
+              k = NumberOfClusterDesired,
+              cluster.only = F)
+
+# Hierarchical technique- agglomerative approach
+
+#library(factoextra)
+res.agnes= hcut(dataToCluster_DM, 
+                k = NumberOfClusterDesired,
+                isdiss=TRUE,
+                hc_func='agnes',
+                hc_method = "ward.D2")
+
+# Hierarchical technique- divisive approach
+res.diana= hcut(dataToCluster_DM, 
+                k = NumberOfClusterDesired,
+                isdiss=TRUE,
+                hc_func='diana',
+                hc_method = "ward.D2")
+
+```
+
+```{r}
+#Is recoding supposed to put these in order?
+library(dplyr)
+```
+
+
+
+2. Clustering Results
+
+```{r}
+#2.1 Add results to original data frame:
+dtcsFinal$pam=as.factor(res.pam$clustering)
+dtcsFinal$agn=as.factor(res.agnes$cluster)
+dtcsFinal$dia=as.factor(res.diana$cluster)
+```
+
+
+```{r}
+#Verify ordinality in clusters
+#aggregate(data=dtcsFinal,
+#          Overallscore~pam, #how do we know what the dependent variable should be?
+#          FUN=mean)
+
+aggregate(data=dtcsFinal,
+          LE2018~pam,
+          FUN=mean)
+#FLAG: Why is this not ordering low to high?
+```
+
+```{r}
+aggregate(data=dtcsFinal,
+         LE2018~agn,
+          FUN=mean)
+```
+
+```{r}
+aggregate(data=dtcsFinal,
+          LE2018~dia,
+          FUN=mean)
+```
+
+Reordering
+```{r}
+#dtcsFinal$pam=dplyr::recode_factor(dtcsFinal$pam, 
+#                  `1` = '2',`2`='1',`3`='3',`4`='4')
+#dtcsFinal$agn=dplyr::recode_factor(dtcsFinal$agn, 
+#                  `1` = '2',`2`='4',`3`='4',`4`='3')
+#dtcsFinal$dia=dplyr::recode_factor(dtcsFinal$dia, 
+#                  `1` = '3',`2`='2',`3`='4',`4`='1')
+```
+```
+
+
+```{r}
+
+
+
+```
+
+
+
+```
+
+
+3. Evaluate Results
+```{r}
+fviz_silhouette(res.pam)
+
+```
+
+
+
+```{r}
+fviz_silhouette(res.agnes)
+
+```
+
+```{r}
+library(factoextra)
+fviz_silhouette(res.diana)
+```
+
+3.2 Detecting badly clustered cases
+
+save individual silhouettes
+
+```{r}
+head(data.frame(res.pam$silinfo$widths),10)
+
+#Reordering cluster indices doesn't seeem to affect nearest neighbor. Why reorder?
+```
+Keeping only the negative clusters
+
+```{r}
+pamEval=data.frame(res.pam$silinfo$widths)
+agnEval=data.frame(res.agnes$silinfo$widths)
+diaEval=data.frame(res.diana$silinfo$widths)
+
+pamPoor=rownames(pamEval[pamEval$sil_width<0,])
+agnPoor=rownames(agnEval[agnEval$sil_width<0,])
+diaPoor=rownames(diaEval[diaEval$sil_width<0,])
+```
+
+```{r}
+#install."qpcr"
+library("qpcR")
+```
+
+^^Come back to above to finish
+
+```{r}
+#If I can ever get rgl to work - see which instances are badly clustered
+bap_Clus=as.data.frame(qpcR:::cbind.na(sort(pamPoor), sort(agnPoor),sort(diaPoor)))
+names(bap_Clus)=c("pam","agn","dia")
+bap_Clus
+
+```
+
+
+HOW TO COMPARE CLUSTERING
+
+Prepare a bidimensional map. The function cmdscale can produce a two dimension map of points using the distance matrix:
+
+```{r}
+projectedData = cmdscale(dataToCluster_DM, k=2)
+
+```
+
+The object projectedData is saving coordinates for each element in the data:
+
+```{r}
+#
+# save coordinates to original data frame:
+dtcsFinal$dim1 = projectedData[,1]
+dtcsFinal$dim2 = projectedData[,2]
+
+# see some:
+
+dtcsFinal[,c('dim1','dim2')][1:10,]
+```
+
+Use those points and see the “map”:
+
+```{r}
+#base= ggplot(data=dtcsFinal,
+#             aes(x=dim1, y=dim2,
+#                 label=Country)) 
+#base + geom_text(size=2)
+
+base= ggplot(data=dtcsFinal,
+             aes(x=dim1, y=dim2,
+                label = rownames(dtcsFinal))) 
+base + geom_text(size=2)
+```
+
+Color the map using the labels from PAM:
+
+```{r}
+pamPlot=base + labs(title = "PAM") + geom_point(size=2,
+                                              aes(color=pam),
+                                              show.legend = T) 
+```
+
+Color the map using the labels from Hierarchical AGNES:
+
+```{r}
+agnPlot=base + labs(title = "AGNES") + geom_point(size=2,
+                                              aes(color=agn),
+                                              show.legend = T) 
+```
+
+Color the map using the labels from Hierarchical DIANA:
+```{r}
+diaPlot=base + labs(title = "DIANA") + geom_point(size=2,
+                                              aes(color=dia),
+                                              show.legend = T) 
+```
+
+Compare visually:
+
+```{r}
+library(ggpubr)
+
+ggarrange(pamPlot, agnPlot, diaPlot,ncol = 3,common.legend = T)
+```
+
+Annotating outliers:
+
+Prepare labels
+FLAG: need to have country var I think, this code doesn't work without it
+```{r}
+# If name of country in black list, use it, else get rid of it
+LABELpam=ifelse(dtcsFinal$Country%in%pamPoor,dtcsFinal$Country,"")
+LABELdia=ifelse(dtcsFinal$Country%in%diaPoor,dtcsFinal$Country,"")
+LABELagn=ifelse(dtcsFinal$Country%in%agnPoor,dtcsFinal$Country,"")
+```
+
+```{r}
+library(ggrepel)
+pamPlot + geom_text_repel(aes(label=LABELpam))
+```
+
+```{r}
+diaPlot + geom_text_repel(aes(label=LABELdia))
+```
+
+```{r}
+agnPlot + geom_text_repel(aes(label=LABELagn))
+```
+
+The Dendogram (for hierarchical approaches)
+```{r}
+fviz_dend(res.agnes,k=NumberOfClusterDesired, cex = 0.45, horiz = T,main = "AGNES approach")
+```
+
+```{r}
+fviz_dend(res.diana,k=NumberOfClusterDesired, cex = 0.45, horiz = T,main = "DIANA approach")
+
+```
+
+
+
+
+Factor Analysis
+- Latent Concepts
+```{r}
+#Creating FA data
+selection
+dataForFA = dtcsFinal
+names(dataForFA)
+
+```
+
+```{r}
+library(lavaan)
+```
+
+```{r}
+model = 'healthsys=~GiniPercent + HE2018 + LE2018'
+
+fit <- cfa(model, data = dataForFA, std.lv = TRUE)
+indexCFA=lavPredict(fit)
+
+```
+
+```{r}
+indexCFA[1:10]
+
+#Rescale to 0:10
+
+library(scales)
+indexCFANorm=rescale(as.vector(indexCFA), 
+                     to = c(0, 10))
+indexCFANorm[1:10]
+
+
+#This is our index
+
+dataForFA$demo_FA=indexCFANorm
+```
+ 
+Comparing new index with original score
+```{r}
+base=ggplot(data=dataForFA,
+            aes(x=demo_FA,y=LE2018))
+base+geom_point()
+```
+
+```{r}
+
+evalCFA1=parameterEstimates(fit, standardized =TRUE)
+
+evalCFA1[evalCFA1$op=="=~",c('rhs','std.all','pvalue')]
+
+
+```
+
+Some coefficients
+```{r}
+evalCFA2=as.list(fitMeasures(fit))
+```
+
+
+You want p.value of chi-square greater than .05
+```{r}
+evalCFA2[c("chisq", "df", "pvalue")] 
+```
+This is not a greater p-value than .05
+
+You want Tucker-Lewis > .9
+```{r}
+evalCFA2$tli # > 0.90
+```
+This is does satisfy Tucker-Lewis criteria
+
+You want RMSEA < 0.05:
+```{r}
+evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
+```
+
+Does not satisfy RMSEA critera
+
+See how it looks: 
+```{r}
+#install.packages("semPlot")
+library(semPlot)
+
+```
+
+
+```{r}
+semPaths(fit, what='std', nCharNodes=0, sizeMan=12,
+         edge.label.cex=1.5, fade=T,residuals = F)
+```
+This Gini Percent is positively associated with model, but health expenditures and life expectancy are not
+
+
+REGRESSION 
+
+Outcome variable as Life Expectancy, HE2018 and GiniPercent as independent variables?
+
+```{r}
+regData = dtcsFinal
+
+```
+
+* EXPLANATORY APPROACH
+1. State hypothesis: Health Expenditure and the Gini Index of a country have an impact on the life expectancy in that country
+
+Prepare your hypothesis:
+```{r}
+#FLAG - have to go back and account for the fact that Gini is negatively coded (higher gini = higher inequality)
+# hypothesis 1: 2018LE increases as gini percent DECREASES (higher equality):
+hypo1=formula(LE2018~ GiniPercent)
+
+# hypothesis 2: 2018 LE increases as health expenditure of a country increases 
+
+hypo2=formula(LE2018~ HE2018)
+
+#hypothesis 3: 2018 LE increases with higher health expenditure and lower gini score
+# -  does this mean needing to make gini negative?
+hypo3=formula(LE2018~ HE2018 + GiniPercent)
+
+```
+
+2. Compute regression models
+
+```{r}
+#
+# results
+gauss1=glm(hypo1,
+           data = regData,
+           family = 'gaussian')
+
+gauss2=glm(hypo2,
+           data = regData,
+           family = 'gaussian')
+
+
+gauss3=glm(hypo3,
+           data = regData,
+           family = 'gaussian')
+```
+
+3. See Results
+
+Hypothesis 1:
+```{r}
+summary(gauss1)
+
+```
+
+-- yes, negative coeff on gini percent, p<.05
+
+Hypothesis 2
+
+```{r}
+summary(gauss2)
+```
+
+coefficient on health expenditure is positive, p>.05
+
+```{r}
+summary(gauss3)
+```
+Hypothesis as expected, HE 2018 pos coeff & significant, GiniPercent negative coeff and significant
+
+4. Search for a better model
+```{r}
+anova(gauss1, gauss2, test="Chisq")
+anova(gauss1, gauss3, test="Chisq")
+anova(gauss2, gauss3, test="Chisq")
+
+```
+
+Model for the third hypothesis is chosen (combined HE + gini)
+```{r}
+install.packages("rsq")
+library(rsq)
+```
+```{r}
+rsq(gauss3, adj=T)
+```
+
+Model 3 has the highest r2 at .379
+
+5. Verify the situation of the chosen model:
+
+5.1 Linearity between dependent variable and predictors is assumed, then these dots should follow a linear and horizontal trend
+```{r}
+plot(gauss3,1)
+```
+Linear relationship doesn't hold
+
+5.2 Normality of residuals is assumed
+Visual exploration
+
+```{r}
+plot(gauss3,2)
+```
+Mathematical exploration
+```{r}
+# The data is normal if the p-value is above 0.05
+shapiro.test(gauss3$residuals)
+```
+
+so, data is not normally distributed
+
+
+5.3. Homoscedasticity is assumed, so you need to check if residuals are spread equally along the ranges of predictors:
+
+Visual exploration
+
+```{r}
+plot(gauss2, 3)
+```
+
+Mathematical exploration
+```{r}
+install.packages("lmtest")
+library(lmtest)
+```
+
+```{r}
+#pvalue<0.05 you cannot assume Homoscedasticity
+bptest(gauss3) 
+```
+Cannot assume homoskedacity; p<.05
+
+5.4. We assume that there is no colinearity, that is, that the predictors are not correlated.
+
+```{r}
+library(car)
+```
+
+```{r}
+vif(gauss3)
+```
+yes, lower than 5 - collinearity is not a problem
+
+5.5. Analize the effect of atypical values. Determine if outliers (points that are far from the rest, but still in the trend) or high-leverage points (far from the trend but close to the rest) are influential:
+
+Visual exploration
+```{r}
+plot(gauss3,5)
+```
+??What does this mean
+
+Querying
+
+```{r}
+gaussInf=as.data.frame(influence.measures(gauss3)$is.inf)
+gaussInf[gaussInf$cook.d,]
+```
+6. Finally, a nice summary plot of your work:
+```{r}
+install.packages("sjPlot")
+library(sjPlot)
+```
+
+```{r}
+plot_models(gauss3,vline.color="grey")
+```
+PREDICTIVE APPROACH
+1. Split the data set
+```{r}
+#install.packages("caret")
+library(caret)
+```
+
+```{r}
+set.seed(123)
+
+selection = createDataPartition(regData$LE2018,
+                                p = 0.75,
+                                list = FALSE)
+#
+trainGauss = regData[ selection, ]
+#
+testGauss  = regData[-selection, ]
+```
+
+
+```{r}
+ctrl = trainControl(method = 'cv',number = 5)
+
+gauss3CV = train(hypo3,
+                 data = trainGauss, 
+                 method = 'glm',
+                 trControl = ctrl)
+
+gauss3CV
+```
+
+R2 = .394
+
+3. Evaluate performance
+
+```{r}
+predictedVal<-predict(gauss3CV,testGauss)
+
+postResample(obs = testGauss$LE2018,
+             pred=predictedVal)
+```
+
+From the information above, you do noy a better prediction: the Rsquared from postResample is below 0.5.
+
+BINARY OUTCOME
+Ignore all below here, data is not binary
+If you have a binary dependent variable (this data is not binary)
+
+```{r}
+#regData$LE2018dico=ifelse(regData$LE2018>median(regData$LE2018,
+#                                       na.rm = T),
+#                     1,0)
+```
+
+*EXPLANATORY APPROACH -- IGNORE, data is not binary. Just including for practice
+1. State hypothesis
+```{r}
+hypoDico1=formula(LE2018dico~ GiniPercent)
+hypoDico2=formula(LE2018dico~ HE2018 + GiniPercent)
+```
+
+2. Reformat
+```{r}
+demoidh$LE2018dico=factor(regData$LE2018dico)
+```
+
+Compute regression models
+```{r}
+Log1=glm(hypoDico1,data = regData,
+         family="binomial")
+
+Logi2=glm(hypoDico2, data=regData,
+          family="binomial")
+
+```
+See Results
+- First Hypothesis
+
+```{r}
+summary(Logi1)
+```
+
+- Second Hypothesis
+```{r}
+summary(Logi2)
+```
+
+Search for a better model:
+```{r}
+lrtest(Logi1,Logi2)
+```
+
+Verify situation of a chosen model
+
+9.1 Linearity assumption (Box-Tidwell test)
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
