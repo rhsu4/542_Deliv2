@@ -1,16 +1,13 @@
 ---
-title: "Cluster Analysis"
+title: "Deliverable 2: Cluster Analysis, Factor Analysis, Regression"
 output: html_notebook
 ---
-Read in the Data
+Reading in the Data from Deliverable 1
+Will take a subset of this data which includes country, health expenditure levels in 2018, life expectancy in 2018, and the country's gini coefficient (measuring inequality in the country, with higher scores meaning higher inequality.)
+
+NOTE FOR WHOLE DELIVERABLE: R instance could not load rgl, a required package for many of these sections (got errors with neverending loading.) The section taking out only the poorly scoring countries based on silhouettes would not run.
 ```{r}
 allData <- read.csv ("https://raw.githubusercontent.com/rhsu4/542_Deliv1/main/allDataWide.csv")
-#WILL NEED TO FIX THE LONG FILE - I don't think it actually distributed the health expenditure by year when it melted. 
-
-
-#Taking only 2018 data
-#subsetData <- subset(allData, Year == "2018", select = c("Country", "GiniPercent", "LifeExp", "HealthExp", "Year"))
-#Would only do this for long format, but long format data needs to be fixed
 
 row.names(allData) = NULL
 
@@ -55,21 +52,22 @@ boxplot(DataToClusterStd)
 ```
 II. Compute the DISTANCE MATRIX
 
+```{r}
+set.seed(999) # this is for replicability of results
+```
+
 
 ```{r}
 dtcsFinal <- na.omit(DataToClusterStd)
 #This includes only instances that have no missing values (153 obs left)
-
-dtcsFinal_DM = daisy (x=dtcsFinal, metric = "gower")
 ```
 
 ```{r}
-#Set random seed
-set.seed(999)
-
 library(cluster)
-dataToCluster_DM = daisy (x=dtcsFinal, metric = "gower")
+dtcsFinal_DM = daisy (x=dtcsFinal, metric = "gower")
+#This creates the distance metric
 ```
+
 
 Compute Clusters - Computer suggestions
 Using function fviz_nbclust from the library factoextra we can see how many clustered are suggested.
@@ -78,11 +76,11 @@ Using function fviz_nbclust from the library factoextra we can see how many clus
 ```{r}
 #for partitioning
 library(factoextra)
+```
 
+```{r}
 #Missing values - have to either add imputed (mean) values, or remove variables that have missing data
-##Life Expectancy - have to replace ".." with "NaN" (in python?)
-##health expectancy - maybe just use this for now, and drop missing countries
-
+#Here, removing NAs
 
 fviz_nbclust(dtcsFinal, 
              pam,
@@ -92,6 +90,7 @@ fviz_nbclust(dtcsFinal,
 
 #Optimal number of clusters = 9
 ```
+
 ```{r}
 #hierarchical - agglomerative 
 fviz_nbclust(dtcsFinal, 
@@ -101,7 +100,7 @@ fviz_nbclust(dtcsFinal,
              k.max = 10,
              verbose = F,
              hc_func = "agnes")
-#agglomerative optimal # of clusters = 4
+#agglomerative optimal # of clusters = 4? 4 is a local average though, so maybe 8 or 9 is better
 ```
 
 ```{r}
@@ -114,14 +113,16 @@ fviz_nbclust(dtcsFinal,
              verbose = F,
              hc_func = "diana")
 
-#divisive clusters = 2
+#divisive clusters = 2 with local average. Actual ideal might be 7
 ```
 
 Apply function
 a priori clusters:
 (partitioning? first kind) = 9
-agglomerative = 4
-divisive = 2
+agglomerative = 4 (or 8, test both)
+divisive = 7 (or 2, test both)
+
+Because the agglomerative and divisive approaches had local maximums, I tested both the suggested number of clusters and the later maximums to see which gave the highest average silhouette width.
 
 ```{r}
 NumberOfClusterDesired=4
@@ -130,7 +131,12 @@ NumberOfClusterDesired=4
 #For clusters = 4, highest avg silhouette width = .37 (pam and agnes)
 #For clusters = 2, highest avg silhouette width = .38 (pam and diana)
 
+#For clusters = 7, highest avg silhouette width = .34 (agnes)
+#For clusters = 8, highest avg silhouette width = .34 (diana)
+
+
 #FLAG: Is 2 clusters enough clusters?
+#Will go with 4, highest avg silhouette width while > 2 clusters
 
 # Partitioning technique
 res.pam = pam(x=dataToCluster_DM,
@@ -160,9 +166,8 @@ res.diana= hcut(dataToCluster_DM,
 library(dplyr)
 ```
 
-
-
 2. Clustering Results
+Creating clusters using the different techniques and with the optimal cluster number (4).
 
 ```{r}
 #2.1 Add results to original data frame:
@@ -181,7 +186,7 @@ dtcsFinal$dia=as.factor(res.diana$cluster)
 aggregate(data=dtcsFinal,
           LE2018~pam,
           FUN=mean)
-#FLAG: Why is this not ordering low to high?
+#These are not ordinal data
 ```
 
 ```{r}
@@ -196,27 +201,16 @@ aggregate(data=dtcsFinal,
           FUN=mean)
 ```
 
-Reordering
+Reordering the clusters based on above
 ```{r}
-#dtcsFinal$pam=dplyr::recode_factor(dtcsFinal$pam, 
-#                  `1` = '2',`2`='1',`3`='3',`4`='4')
-#dtcsFinal$agn=dplyr::recode_factor(dtcsFinal$agn, 
-#                  `1` = '2',`2`='4',`3`='4',`4`='3')
-#dtcsFinal$dia=dplyr::recode_factor(dtcsFinal$dia, 
-#                  `1` = '3',`2`='2',`3`='4',`4`='1')
-```
-```
-
-
-```{r}
-
-
-
+dtcsFinal$pam=dplyr::recode_factor(dtcsFinal$pam, 
+                  `1` = '2',`2`='1',`3`='3',`4`='4')
+dtcsFinal$agn=dplyr::recode_factor(dtcsFinal$agn, 
+                  `1` = '2',`2`='4',`3`='4',`4`='3')
+dtcsFinal$dia=dplyr::recode_factor(dtcsFinal$dia, 
+                  `1` = '3',`2`='2',`3`='4',`4`='1')
 ```
 
-
-
-```
 
 
 3. Evaluate Results
@@ -235,6 +229,7 @@ fviz_silhouette(res.agnes)
 ```{r}
 library(factoextra)
 fviz_silhouette(res.diana)
+
 ```
 
 3.2 Detecting badly clustered cases
@@ -243,8 +238,6 @@ save individual silhouettes
 
 ```{r}
 head(data.frame(res.pam$silinfo$widths),10)
-
-#Reordering cluster indices doesn't seeem to affect nearest neighbor. Why reorder?
 ```
 Keeping only the negative clusters
 
@@ -261,9 +254,10 @@ diaPoor=rownames(diaEval[diaEval$sil_width<0,])
 ```{r}
 #install."qpcr"
 library("qpcR")
+
 ```
 
-^^Come back to above to finish
+^^NOTE for homework: could not get "qpcr" to work because rgl wouldn't work. Tried installing pckgs separately, uninstalling whole thing, didn't work
 
 ```{r}
 #If I can ever get rgl to work - see which instances are badly clustered
@@ -344,12 +338,17 @@ ggarrange(pamPlot, agnPlot, diaPlot,ncol = 3,common.legend = T)
 Annotating outliers:
 
 Prepare labels
-FLAG: need to have country var I think, this code doesn't work without it
+FLAG: need to have country var I think, this code doesn't work without it. Or rowname?
 ```{r}
 # If name of country in black list, use it, else get rid of it
-LABELpam=ifelse(dtcsFinal$Country%in%pamPoor,dtcsFinal$Country,"")
-LABELdia=ifelse(dtcsFinal$Country%in%diaPoor,dtcsFinal$Country,"")
-LABELagn=ifelse(dtcsFinal$Country%in%agnPoor,dtcsFinal$Country,"")
+#LABELpam=ifelse(dtcsFinal$rowname%in%pamPoor,dtcsFinal$rowname,"")
+#LABELdia=ifelse(dtcsFinal$Country%in%diaPoor,dtcsFinal$Country,"")
+#LABELagn=ifelse(dtcsFinal$Country%in%agnPoor,dtcsFinal$Country,"")
+
+#HOMEWORK NOTE: This isn't working because rgl package won't work
+LABELpam=ifelse(dtcsFinal$rowname%in%pamPoor,dtcsFinal$rowname,"")
+LABELdia=ifelse(dtcsFinal$rowname%in%diaPoor,dtcsFinal$rowname,"")
+LABELagn=ifelse(dtcsFinal$rowname%in%agnPoor,dtcsFinal$rowname,"")
 ```
 
 ```{r}
@@ -364,6 +363,8 @@ diaPlot + geom_text_repel(aes(label=LABELdia))
 ```{r}
 agnPlot + geom_text_repel(aes(label=LABELagn))
 ```
+
+NOTE: Above section doesn't work because it depends on rgl (in qpcR) which won't load or install
 
 The Dendogram (for hierarchical approaches)
 ```{r}
@@ -382,7 +383,7 @@ Factor Analysis
 - Latent Concepts
 ```{r}
 #Creating FA data
-selection
+#selection
 dataForFA = dtcsFinal
 names(dataForFA)
 
@@ -393,7 +394,7 @@ library(lavaan)
 ```
 
 ```{r}
-model = 'healthsys=~GiniPercent + HE2018 + LE2018'
+model = 'healthsys=~ HE2018 + LE2018 + GiniPercent'
 
 fit <- cfa(model, data = dataForFA, std.lv = TRUE)
 indexCFA=lavPredict(fit)
@@ -455,7 +456,7 @@ You want RMSEA < 0.05:
 evalCFA2[c( 'rmsea.ci.lower','rmsea','rmsea.ci.upper')] 
 ```
 
-Does not satisfy RMSEA critera
+Does satisfy RMSEA critera
 
 See how it looks: 
 ```{r}
@@ -469,7 +470,7 @@ library(semPlot)
 semPaths(fit, what='std', nCharNodes=0, sizeMan=12,
          edge.label.cex=1.5, fade=T,residuals = F)
 ```
-This Gini Percent is positively associated with model, but health expenditures and life expectancy are not
+Health expenditure and Life expectancy are positively associated with model, gini percent is negatively associated. Life expectancy is most associated with the health system
 
 
 REGRESSION 
@@ -478,7 +479,7 @@ Outcome variable as Life Expectancy, HE2018 and GiniPercent as independent varia
 
 ```{r}
 regData = dtcsFinal
-
+`
 ```
 
 * EXPLANATORY APPROACH
@@ -486,7 +487,7 @@ regData = dtcsFinal
 
 Prepare your hypothesis:
 ```{r}
-#FLAG - have to go back and account for the fact that Gini is negatively coded (higher gini = higher inequality)
+#FLAG -  Gini is negatively coded (higher gini = higher inequality)
 # hypothesis 1: 2018LE increases as gini percent DECREASES (higher equality):
 hypo1=formula(LE2018~ GiniPercent)
 
@@ -552,7 +553,7 @@ anova(gauss2, gauss3, test="Chisq")
 
 Model for the third hypothesis is chosen (combined HE + gini)
 ```{r}
-install.packages("rsq")
+#install.packages("rsq")
 library(rsq)
 ```
 ```{r}
@@ -594,7 +595,7 @@ plot(gauss2, 3)
 
 Mathematical exploration
 ```{r}
-install.packages("lmtest")
+#install.packages("lmtest")
 library(lmtest)
 ```
 
@@ -631,7 +632,7 @@ gaussInf[gaussInf$cook.d,]
 ```
 6. Finally, a nice summary plot of your work:
 ```{r}
-install.packages("sjPlot")
+#install.packages("sjPlot")
 library(sjPlot)
 ```
 
