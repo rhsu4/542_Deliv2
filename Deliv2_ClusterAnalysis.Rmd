@@ -366,8 +366,6 @@ diaPlot + geom_text_repel(aes(label=LABELdia), max.overlaps = Inf)
 agnPlot + geom_text_repel(aes(label=LABELagn), max.overlaps = Inf)
 ```
 
-NOTE: Above section doesn't work because it depends on rgl (in qpcR) which won't load or install
-
 The Dendogram (for hierarchical approaches)
 ```{r}
 fviz_dend(res.agnes,k=NumberOfClusterDesired, cex = 0.45, horiz = T,main = "AGNES approach")
