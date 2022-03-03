@@ -246,9 +246,9 @@ pamEval=data.frame(res.pam$silinfo$widths)
 agnEval=data.frame(res.agnes$silinfo$widths)
 diaEval=data.frame(res.diana$silinfo$widths)
 
-pamPoor=rownames(pamEval[pamEval$sil_width<0,])
-agnPoor=rownames(agnEval[agnEval$sil_width<0,])
-diaPoor=rownames(diaEval[diaEval$sil_width<0,])
+pamPoor=row.names(pamEval[pamEval$sil_width<0,])
+agnPoor=row.names(agnEval[agnEval$sil_width<0,])
+diaPoor=row.names(diaEval[diaEval$sil_width<0,])
 ```
 
 ```{r}
@@ -257,7 +257,6 @@ library("qpcR")
 
 ```
 
-^^NOTE for homework: could not get "qpcr" to work because rgl wouldn't work. Tried installing pckgs separately, uninstalling whole thing, didn't work
 
 ```{r}
 #If I can ever get rgl to work - see which instances are badly clustered
