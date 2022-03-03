@@ -84,7 +84,7 @@ library(factoextra)
 
 fviz_nbclust(dtcsFinal, 
              pam,
-             diss=dataToCluster_DM,
+             diss=dtcsFinal_DM,
              method = "gap_stat",
              k.max = 10,verbose = F)
 
@@ -95,7 +95,7 @@ fviz_nbclust(dtcsFinal,
 #hierarchical - agglomerative 
 fviz_nbclust(dtcsFinal, 
              hcut,
-             diss=dataToCluster_DM,
+             diss=dtcsFinal_DM,
              method = "gap_stat",
              k.max = 10,
              verbose = F,
@@ -107,7 +107,7 @@ fviz_nbclust(dtcsFinal,
 #hierarchical (divisive)
 fviz_nbclust(dtcsFinal, 
              hcut,
-             diss=dataToCluster_DM,
+             diss=dtcsFinal_DM,
              method = "gap_stat",
              k.max = 10,
              verbose = F,
@@ -139,21 +139,21 @@ NumberOfClusterDesired=4
 #Will go with 4, highest avg silhouette width while > 2 clusters
 
 # Partitioning technique
-res.pam = pam(x=dataToCluster_DM,
+res.pam = pam(x=dtcsFinal_DM,
               k = NumberOfClusterDesired,
               cluster.only = F)
 
 # Hierarchical technique- agglomerative approach
 
 #library(factoextra)
-res.agnes= hcut(dataToCluster_DM, 
+res.agnes= hcut(x=dtcsFinal_DM, 
                 k = NumberOfClusterDesired,
                 isdiss=TRUE,
                 hc_func='agnes',
                 hc_method = "ward.D2")
 
 # Hierarchical technique- divisive approach
-res.diana= hcut(dataToCluster_DM, 
+res.diana= hcut(x=dtcsFinal_DM, 
                 k = NumberOfClusterDesired,
                 isdiss=TRUE,
                 hc_func='diana',
@@ -273,7 +273,7 @@ HOW TO COMPARE CLUSTERING
 Prepare a bidimensional map. The function cmdscale can produce a two dimension map of points using the distance matrix:
 
 ```{r}
-projectedData = cmdscale(dataToCluster_DM, k=2)
+projectedData = cmdscale(dtcsFinal_DM, k=2)
 
 ```
 
@@ -346,22 +346,25 @@ FLAG: need to have country var I think, this code doesn't work without it. Or ro
 #LABELagn=ifelse(dtcsFinal$Country%in%agnPoor,dtcsFinal$Country,"")
 
 #HOMEWORK NOTE: This isn't working because rgl package won't work
-LABELpam=ifelse(dtcsFinal$rowname%in%pamPoor,dtcsFinal$rowname,"")
-LABELdia=ifelse(dtcsFinal$rowname%in%diaPoor,dtcsFinal$rowname,"")
-LABELagn=ifelse(dtcsFinal$rowname%in%agnPoor,dtcsFinal$rowname,"")
+LABELpam=ifelse(row.names(dtcsFinal)%in%pamPoor,row.names(dtcsFinal),"")
+LABELdia=ifelse(row.names(dtcsFinal)%in%diaPoor,row.names(dtcsFinal),"")
+LABELagn=ifelse(row.names(dtcsFinal)%in%agnPoor,row.names(dtcsFinal),"")
+
+
+
 ```
 
 ```{r}
 library(ggrepel)
-pamPlot + geom_text_repel(aes(label=LABELpam))
+pamPlot + geom_text_repel(aes(label=LABELpam), max.overlaps = Inf)
 ```
 
 ```{r}
-diaPlot + geom_text_repel(aes(label=LABELdia))
+diaPlot + geom_text_repel(aes(label=LABELdia), max.overlaps = Inf)
 ```
 
 ```{r}
-agnPlot + geom_text_repel(aes(label=LABELagn))
+agnPlot + geom_text_repel(aes(label=LABELagn), max.overlaps = Inf)
 ```
 
 NOTE: Above section doesn't work because it depends on rgl (in qpcR) which won't load or install
@@ -479,7 +482,7 @@ Outcome variable as Life Expectancy, HE2018 and GiniPercent as independent varia
 
 ```{r}
 regData = dtcsFinal
-`
+
 ```
 
 * EXPLANATORY APPROACH
@@ -670,7 +673,7 @@ gauss3CV = train(hypo3,
 gauss3CV
 ```
 
-R2 = .394
+R2 = .4299
 
 3. Evaluate performance
 
@@ -682,6 +685,13 @@ postResample(obs = testGauss$LE2018,
 ```
 
 From the information above, you do noy a better prediction: the Rsquared from postResample is below 0.5.
+^^What does that comment mean?
+
+R2 now = .572
+
+
+
+
 
 BINARY OUTCOME
 Ignore all below here, data is not binary
